@@ -1,0 +1,19 @@
+{
+  "name": "ray",
+  "version": "1.0.0",
+  "description": "lights. camera. action!",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "lint": "eslint ."
+  },
+  "author": "JD Hartley <jdhrtl@gmail.com>",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^3.7.1"
+  },
+  "dependencies": {
+    "form-data": "^2.1.0",
+    "request": "^2.75.0"
+  }
+}
