@@ -1,6 +1,10 @@
 # Config
 config/hue-bridge.json
 
+# OS Files
+.DS_Store
+Thumbs.db
+
 # Logs
 logs
 *.log
