@@ -1,5 +1,5 @@
 # Config
-config/hue-bridge.json
+src/config/config.json
 
 # OS Files
 .DS_Store

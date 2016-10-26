@@ -1,12 +1,14 @@
+// Step 1: get current state and send in event
+
 'use strict';
 
-var Promise = require('bluebird');
-var request = require('request-promise');
-var sleep = require('sleep-promise');
+var aws = require('aws-sdk');
 
+// Config
+const config = require('./src/config/config.json');
 
-// Auth Config
-const { accessToken, bridgeId, username } = require('./config/hue-bridge.json');
+// Get info on hue lights group
+const getGroup = require('./src/hue.js').getGroup;
 
 // Light Groups
 const
@@ -14,65 +16,50 @@ const
     GROUP_LIVING_ROOM = 1,
     GROUP_BEDROOM = 2;
 
+exports.handler = (event, context, callback) => {
+    var lambda = new aws.Lambda({ region: 'us-east-1' });
 
-// Hue API Functions
-const _handleError = (err) => { throw new Error(err) };
+    try {
+        const group = GROUP_LIVING_ROOM;
 
-function getBridge() {
-    const url = 'https://www.meethue.com/api/getbridge';
-    const qs = { token: accessToken, bridgeid: bridgeId };
-    const headers = { 'content-type': 'application/x-www-form-urlencoded' };
+        getGroup(group)
+            .catch((err) => { throw new Error(err) })
+            .then((action) => {
+                const payload = { group, action };
 
-    return request.get({ url, qs, headers, json: true }).catch(_handleError);
-}
+                console.log('payload is');
+                console.log(JSON.stringify(payload, null, 2));
 
-function sendMessage(clipCommand) {
-    const url = 'https://www.meethue.com/api/sendmessage';
-    const clipmessage = { bridgeId: bridgeId, clipCommand };
-    const formData = { token: accessToken, clipmessage: JSON.stringify(clipmessage) };
+                lambda.invoke({
+                    FunctionName: 'redAlertLights',
+                    InvocationType: 'Event',
+                    Payload: JSON.stringify(payload)
+                }, function() {
+                    console.log('lambda here!');
+                    console.log(arguments);
+                });
 
-    return request.post({ url, formData, json: true }).catch(_handleError);
-}
+                console.log('sending callback');
 
-
-// API Helper Functions
-function getGroup(group) {
-    return getBridge().then((data) => data.groups[group].action);
-}
-
-function setGroup(group, body) {
-    const url = '/api/0/groups/' + group + '/action';
-    return sendMessage({ url, body, method: 'PUT' });
-}
-
-
-// Red Alert!
-function redAlert(group) {
-    const body = {
-        // Make sure lights are on and super bright!
-        on: true,
-        transitiontime: 0,
-        bri: 254,
-
-        // Oh shit the borg!!! Blinky times!!!
-        alert: 'lselect',
-
-        // Set to a nice red color
-        colormode: 'hs',
-        hue: 339,
-        sat: 254
-    };
-
-    const currentState = getGroup(group);
-    const blinkyTimes = currentState.then(() => setGroup(group, body));
-    const sleepyTimes = blinkyTimes.then(sleep(7 * 1000));
-
-    return Promise.join(currentState, sleepyTimes, (oldAction) => {
-        // reset alert to none so we don't keep blinking
-        const newAction = { alert: 'none', transitiontime: 2 };
-        return setGroup(group, Object.assign({}, oldAction, newAction));
-    });
-}
-
-
-redAlert(GROUP_LIVING_ROOM);
+                callback(null, {
+                    version: '1.0',
+                    sessionAttributes: {},
+                    response: {
+                        outputSpeech: {
+                            type: 'SSML',
+                            ssml: `<speak><audio src="${config.streamUrl}" /></speak>`
+                        },
+                        card: {
+                            type: 'Simple',
+                            title: 'Red Alert',
+                            content: 'Red alert, shields up!'
+                        },
+                        shouldEndSession: true
+                    }
+                });
+            })
+    } catch(err) {
+        console.log(err);
+        callback(err);
+    }
+};
